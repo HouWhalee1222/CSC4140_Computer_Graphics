@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 2.8)
+
+project(CSC_4140_Assignment1)
+
+
+
+set(CMAKE_CXX_STANDARD 11)
+
+set(CMAKE_CXX_FLAGS "-std=c++11")
+
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+
+
+find_package(OpenCV REQUIRED)
+
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+include_directories(${EIGEN3_INCLUDE_DIRS})
+
+
+
+add_executable(asg1 main.cpp)
+
+target_link_libraries(asg1 Eigen3::Eigen ${OpenCV_LIBS})

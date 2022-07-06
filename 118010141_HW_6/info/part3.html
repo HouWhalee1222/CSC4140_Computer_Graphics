@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Ray Tracing: Part 3</title><meta http-equiv="Content-Language" content="en"><link rel="stylesheet" href="./part3_files/ionicons.min.css">
+<link rel="stylesheet" href="./part3_files/web-5d805804.css">
+<link rel="stylesheet" href="./part3_files/katex.min.css">
+<link rel="stylesheet" href="./part3_files/github-markdown.css">
+<link rel="stylesheet" href="./part3_files/github.min.css"><style type="text/css">date-input-polyfill{background:#fff;color:#000;text-shadow:none;border:0;padding:0;height:auto;width:auto;line-height:normal;font-family:sans-serif;font-size:14px;position:absolute!important;text-align:center;box-shadow:0 3px 10px 1px rgba(0,0,0,.22);cursor:default;z-index:1;border-radius:5px;-moz-border-radius:5px;-webkit-border-radius:5px;overflow:hidden;display:block}date-input-polyfill[data-open=false]{visibility:hidden;z-index:-100!important;top:0}date-input-polyfill[data-open=true]{visibility:visible}date-input-polyfill select,date-input-polyfill table,date-input-polyfill td,date-input-polyfill th{background:#fff;color:#000;text-shadow:none;border:0;padding:0;height:auto;width:auto;line-height:normal;font-family:sans-serif;font-size:14px;box-shadow:none;font-family:Lato,Helvetica,Arial,sans-serif}date-input-polyfill button,date-input-polyfill select{border:0;border-radius:0;border-bottom:1px solid #dadfe1;height:24px;vertical-align:top;-webkit-appearance:none;-moz-appearance:none}date-input-polyfill .monthSelect-wrapper{width:55%;display:inline-block}date-input-polyfill .yearSelect-wrapper{width:25%;display:inline-block}date-input-polyfill select{width:100%}date-input-polyfill select:first-of-type{border-right:1px solid #dadfe1;border-radius:5px 0 0 0;-moz-border-radius:5px 0 0 0;-webkit-border-radius:5px 0 0 0}date-input-polyfill button{width:20%;background:#dadfe1;border-radius:0 5px 0 0;-moz-border-radius:0 5px 0 0;-webkit-border-radius:0 5px 0 0}date-input-polyfill button:hover{background:#eee}date-input-polyfill table{border-collapse:separate!important;border-radius:0 0 5px 5px;-moz-border-radius:0 0 5px 5px;-webkit-border-radius:0 0 5px 5px;overflow:hidden;max-width:280px;width:280px}date-input-polyfill td,date-input-polyfill th{width:32px;padding:4px;text-align:center;box-sizing:content-box}date-input-polyfill td[data-day]{cursor:pointer}date-input-polyfill td[data-day]:hover{background:#dadfe1}date-input-polyfill [data-selected]{font-weight:700;background:#d8eaf6}</style></head><body><script>$MG={"browserRefresh":false,"activeSemester":{"id":7,"tag":"sp22"},"auth":{"profile":null},"semester":{"id":7,"tag":"sp22"}}</script><div id="app-root"><div class="rel" id="app-page"><header class="rel" id="app-header"></header><div class="full" id="app-page__body"><div class="article"><div class="article-header"><h1>Part 3: Direct Illumination</h1></div><div class="article-body"><div class="comp-md markdown-body"><p>In this part, we will start simulating light transport in the scene, and render images with realistic shading.</p>
+<p>The main function that gets called in the rendering loop is <code>est_radiance_global_illumination</code> in <em>src/pathtracer/pathtracer.cpp</em>. In the starter code, this function returns a debug color where RGB is simply set to the normal vector of the surface. We'll be modifying this function as we work through the next few tasks.</p>
+<p>For each task, you should read the "Additional code that will be useful" and "Notes" sections, which contain helpful or necessary implementation information beyond the theoretical descriptions.</p>
+<h2>Task 1: Diffuse BSDF</h2>
+<h3>Introducing the BSDF</h3>
+<p>The material properties of the surfaces we render are encoded in the <code>BSDF</code> class. BSDF stands for Bidirectional Scattering Distribution Function, which is a generalization of the BRDF to represent materials that can both reflect and transmit light. <code>BSDF</code> objects represent the <strong><em>ratio</em> of incoming light</strong> scattered from <strong>incident direction</strong> to <strong>outgoing direction</strong>. There are different subclasses for different types of materials.</p>
+<p>For Assignment 6, we will primarily be dealing with DiffuseBSDFs (and to a lesser extent, EmissiveBSDFs).</p>
+<p>We also define a handful of mathematical helper functions in <em>src/pathtracer/bsdf.h</em> for dealing with vectors representing directions in the unit hemisphere.</p>
+<h3>Your task</h3>
+<p>In this task, you will implement the function <code>DiffuseBSDF::f</code> to represent a diffuse material that reflects incoming light equally in all directions on the hemisphere. Reference the relevant lecture slides.</p>
+<p><code>DiffuseBSDF::f</code> takes as input the incoming solid angle <code>wi</code> and the outgoing solid angle <code>wo</code> and returns <code>f(wi -&gt; wo)</code>.</p>
+<p>Notes:</p>
+<ul>
+<li>The albedo of the material is stored in its <code>reflectance</code> parameter. This is a <em>Vector3D</em> in order to describe the reflectance for R, G, and B channels simultaneously.</li>
+<li>The <code>Vector3D DiffuseBSDF::f</code> function takes the <code>wo</code> and <code>wi</code> vectors, and returns an refletance. Depending on the type of BSDF, you may not need these two vectors.</li>
+<li>The <code>Vector3D DiffuseBSDF::sample_f</code> function needs to set a value to <code>wi</code>. <code>wi</code> is passed in as a pointer so you can set its value.</li>
+<li>This section only requires a couple lines of code.</li>
+</ul>
+<p>Nothing new to render yet -- we'll use this in task 3 and 4!</p>
+<h2>Task 2: Zero-bounce Illumination</h2>
+<p>Zero-bounce illumination refers to light that reaches the camera without bouncing off anything in the scene. In other words, it is only the light that comes from the light source itself.</p>
+<p>Implement the function <code>zero_bounce_radiance</code>, which takes as input a <code>Ray</code> and the <code>Intersection</code> object corresponding with that ray and the scene.</p>
+<p>The function should return the emission of the object that was intersected.</p>
+<p>Once you're done, update <code>est_radiance_global_illumination</code> to return the zero-bounce radiance (instead of normal shading).</p>
+<p>Code that will be useful to you:</p>
+<ul>
+<li>BSDFs have a <code>get_emission()</code> function that return the emissive spectrum of the object.</li>
+<li>Review the different fields of <code>Intersection</code>.</li>
+</ul>
+<p>If you find these function names confusing, we have introduced the code pipeline in the main page of the specs ("Basic Code Pipeline")</p>
+<p>Now, when you render a scene, you should see the area light at the top of the Cornell Box.</p>
+<p><code>./pathtracer -t 8 -s 16 -l 8 -m 6 -H -f CBbunny_16_8.png -r 480 360 ../dae/sky/CBbunny.dae</code></p>
+<p style="text-align:center">
+<img src="./part3_files/y1TeWT0.png" width="480px">
+</p>
+<h2>Task 3: Direct Lighting with Uniform Hemisphere Sampling</h2>
+<p>Now that you have one material at your disposal, we can implement direct lighting estimations! There are two methods for this. The first is <code>estimate_direct_lighting_hemisphere</code>, where we estimate the direct lighting on a point by sampling uniformly in a hemisphere. We will focus on this function for this task. The second is <code>estimate_direct_lighting_importance</code>, which you will implement in Task 4.</p>
+<p>Note that we are tracing <em>inverse</em> rays. We first cast a ray from the camera, through a specific pixel, and into the scene. Once it intersects something in the scene, we need to determine the color of our corresponding pixel. We do this by calculating how much light is <em>reflected</em> back towards the camera at this intersection point. To do this, we first need to estimate how much light <em>arrived</em> at that intersection point from elsewhere.</p>
+<p style="text-align:center">
+<img src="./part3_files/onebounce.png" alt="One bounce demo" style="zoom: 33%;">
+</p>
+<p>In order to estimate how much light <em>arrived</em> at the intersection point, lets recall the rendering equation from lecture. We need to integrate over all the light arriving in a hemisphere around the point of interest (<code>hit_p</code> in the code). This comes from the definition of irradiance.</p>
+<p>As shown in the slide, we approximate this integral using a Monte Carlo estimator:</p>
+<p style="text-align:center">
+    \<img src="./part3_files/refmc.png" alt="reflection equation monte carlo estimate" style="zoom: 67%;">
+</p>
+<p>In our code, <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>p</mi></mrow><annotation encoding="application/x-tex">p</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.625em;vertical-align:-0.19444em;"></span><span class="base textstyle uncramped"><span class="mord mathit">p</span></span></span></span> is repesented by <code>hit_p</code>, and <span class="katex"><span class="katex-mathml"><math><semantics><mrow><msub><mi>w</mi><mi>r</mi></msub></mrow><annotation encoding="application/x-tex">w_r</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.58056em;vertical-align:-0.15em;"></span><span class="base textstyle uncramped"><span class="mord"><span class="mord mathit" style="margin-right:0.02691em;">w</span><span class="vlist"><span style="top:0.15em;margin-right:0.05em;margin-left:-0.02691em;"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span><span class="reset-textstyle scriptstyle cramped"><span class="mord mathit" style="margin-right:0.02778em;">r</span></span></span><span class="baseline-fix"><span class="fontsize-ensurer reset-size5 size5"><span style="font-size:0em;">​</span></span>​</span></span></span></span></span></span> is represented by <code>w_out</code>. For this task, we will <strong>uniformly sample incoming ray directions in the hemisphere</strong>. Right now, we are only worried about direct illumination, so we want to <strong>check if a new ray going <em>from</em> the <code>hit_p</code> <em>in the sampled direction</em> intersects a light source</strong>. (Otherwise, we do not care about this sampled direction -- it doesn't add any direct light to the point of interest).</p>
+<p>Then, once we have an estimate of incoming light, we can use <strong>the reflection equation</strong> to calculate how much outgoing light there is.</p>
+<p>Finally, <strong>update the wrapper function</strong> <code>one_bounce_radiance</code> to call your direct lighting function, and <strong>update</strong> <code>est_radiance_global_illumination</code> to add <code>one_bounce_radiance</code> to your output.</p>
+<h3>Implementation details</h3>
+<p>The starter code gives you:</p>
+<ul>
+<li><code>o2w</code> and <code>w2o</code>, matrices for object-to-world space and world-to-object space transformations, respectively.
+<ul>
+<li>These were created using the input <code>isect</code>'s normal to calculate a local coordinate space for the object hit point. In this local space, the normal is <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mo>(</mo><mn>0</mn><mo separator="true">,</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo>)</mo></mrow><annotation encoding="application/x-tex">(0,0,1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.75em;"></span><span class="strut bottom" style="height:1em;vertical-align:-0.25em;"></span><span class="base textstyle uncramped"><span class="mopen">(</span><span class="mord mathrm">0</span><span class="mpunct">,</span><span class="mord mathrm">0</span><span class="mpunct">,</span><span class="mord mathrm">1</span><span class="mclose">)</span></span></span></span>, so that <span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>z</mi></mrow><annotation encoding="application/x-tex">z</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="strut" style="height:0.43056em;"></span><span class="strut bottom" style="height:0.43056em;vertical-align:0em;"></span><span class="base textstyle uncramped"><span class="mord mathit" style="margin-right:0.04398em;">z</span></span></span></span> is "up".</li>
+<li>Note that these are each the transpose <em>and</em> inverse of the other (they're orthonormal!)</li>
+</ul>
+</li>
+<li><code>hit_p</code>, the hit point of the ray, for convenience (note which coordinate space this is in).</li>
+<li><code>w_out</code>, the outgoing direction in the local object frame.</li>
+<li><code>num_samples</code>, which you should use as the number of directions in the hemisphere you should sample.</li>
+<li><code>EPS_F</code>, an epsilon constant that can be used to avoid numerical precision issues.</li>
+</ul>
+<p>Additional code that will be useful:</p>
+<ul>
+<li><code>UniformHemisphereSampler3D::get_sample()</code>
+<ul>
+<li>the PathTracer class contains a <code>hemisphereSampler</code></li>
+<li>returns a object-space vector, unfirormly randomly sampled on the hemisphere</li>
+</ul>
+</li>
+<li><code>BVHAccel::intersect(Ray&amp; r, Intersection* i)</code></li>
+<li><code>BSDF::get_emission()</code></li>
+<li><code>BSDF::f(Vector3D&amp; wo, Vector3D&amp; wi)</code></li>
+<li><code>Pathtracer::one_bounce_radiance(Ray&amp; r, Intersection&amp; i)</code></li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li>Recall that the cosine of the angle between two unit vectors is equal to their dot product.</li>
+<li>Be aware of which vectors are in world space or in object space. For example, the BSDF is a property of an object -- so which coordinate space should we use with it? Which coordinate space should we use when intersecting rays?</li>
+<li>When casting new rays from existing hit points, you should set the ray's <code>min_t</code> field to a small constant, <code>EPS_F</code>.
+<ul>
+<li>This alleviates numerical precision issues that cause the ray to intersect the surface it started from. (i.e., by setting the <code>min_t</code> field, we won't consider intersections with a surface at the ray's origin a valid intersection).</li>
+</ul>
+</li>
+<li>Don't forget that we are <em>estimating</em> the lighting, and need to normalize by the number of samples and by the probability of taking each sample.</li>
+<li>Don't forget all the multiplicative factors that are part of the reflection equation.</li>
+</ul>
+<p>To test your results, update<code>est_radiance_global_illumination()</code> to return <code>estimate_direct_lighting_hemisphere()</code>. Now, you should be able to render any CB scenes with lambertian diffuse BSDFs, like CBspheres and CBbunny.</p>
+<h3>Fast renders for testing</h3>
+<p>We're reaching the point in the assignment where high and even medium-quality renders can take a long time to complete. For that reason, we want to reiterate again several methods to speed up render times, particularly when iterating on your code/bug fixing.</p>
+<p><strong>Reduce number of samples, bounces, etc.</strong>
+There are three main parameters that have a large effect on rendering time: the number of samples per pixel (<code>-s</code> parameter), samples per light (<code>-l</code> parameter), and bounces per primary ray (<code>-m</code> parameter). When testing your code, you should initially use the <em>smallest appropriate number of samples</em>. For example, when testing if you can randomly sample pixels correctly, you may want to use more than 1 sample, but you certainly don't need to use 256 while testing. <strong>Note: use the correct number of samples specified in the writeup directions when generating your final results!</strong></p>
+<p><strong>Render a zoomed out view of the scene</strong></p>
+<pre><code>./pathtracer -t 8 -s 64 -l 32 -H -f CBbunny_H_64_32.png -r 100 100 ../dae/sky/CBbunny.dae
+</code></pre>
+<p>Here, we set the resolution of our window to be 100 pixels by 100 pixels -- super small! We can then use the camera controls and scroll to zoom out. This gives us a preview like the image on the left, and renders out like the image on the right. This took approximately <strong>15 seconds</strong>, compared to the 50+ seconds to render the 480x360 resolution image</p>
+<p>You can also zoom out without decreasing the overall size of the window for the same speedup!</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Small, zoomed out</th>
+<th style="text-align:center">After rendering</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><img src="./part3_files/PwiFMyl.png" alt=""></td>
+<td style="text-align:center"><img src="./part3_files/gykeJ2M.png" alt=""></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Use cell rendering functionality</strong></p>
+<p>After you hit <strong>R</strong> to start a render, you can then hit <strong>C</strong> to enter <em>cell rendering</em> mode. This allows you to then click and drag a rectangle to render. This is helpful to spot check areas of your scene without having to wait for the whole thing to render. In particular, the render will always render from the bottom up, which means you might wait a long time waiting for only the floor to render -- not very interesting or useful!</p>
+<p>Here's an example of cell rendering a few different spots of the scene, which conveys a lot of information about the render while only taking about <strong>20 seconds</strong> for all cells put together!</p>
+<p>The original command used was the following, though remember you will need to start a render with <strong>R</strong> then enter cell rendering mode with <strong>C</strong>.</p>
+<pre><code>./pathtracer -t 8 -s 64 -l 32 -H -f CBbunny_H_64_32.png -r 480 360 ../dae/sky/CBbunny.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/yBibb09.png" width="480px">
+</p>
+<h3>Full-sized results</h3>
+<p>At this point, here is the result of the command:</p>
+<pre><code>./pathtracer -t 8 -s 16 -l 8 -H -f CBbunny_H_16_8.png -r 480 360 ../dae/sky/CBbunny.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/CBbunny_H_16_8.png" width="480px">
+</p>
+<p>And the command below took 52 seconds with the reference solution on a Hive machine.</p>
+<pre><code>./pathtracer -t 8 -s 64 -l 32 -m 6 -H -f CBbunny_H_64_32.png -r 480 360 ../dae/sky/CBbunny.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/CBbunny_H_64_32.png" width="480px">
+</p>
+Now you should be able to render nice direct lighting effects such as area light shadows and ambient occlusion, albeit without full global illumination.
+<p>One limitation of the current renderer is that you will only be able to render files with Lambertian diffuse BSDFs, as we have not yet implemented any of the other BSDFs (You will implement these in assignment 7!). There's also another problem -- we can't render any scenes with point light sources, since our outgoing rays will essentially never intersect with them! (We're sampling directions in a hemisphere -- what's the probability of hitting a single point?)</p>
+<p>Let's fix that!</p>
+<h2>Task 4: Direct Lighting by Importance Sampling Lights</h2>
+<p>Our results from uniform hemisphere sampling are quite noisy! While they will converge to the correct result, we can do better. We also want to be able to render images that only have point lights.</p>
+<p>Fill in <code>estimate_direct_lighting_importance</code>, which has the same goal as <code>estimate_direct_lighting_hemisphere</code>, but will sample all the lights directly, rather than uniform directions in a hemisphere.</p>
+<p>For each light in the scene, we want to <strong>sample directions between the light source and the <code>hit_p</code></strong>. If we <strong>cast a ray in this direction</strong> and there is no other object between the hit point and the light source, then we know that this light source <em>does</em> cast light onto the hit point.</p>
+<p>From this point, it's only a matter of using the reflectance equation as in Task 3 to calculate the total amount of outgoing light.</p>
+<p>Finally, <strong>update the wrapper function</strong> <code>one_bounce_radiance</code> to calculate direct lighting via hemisphere sampling <em>or</em> importance sampling based on the value of <code>direct_hemisphere_sample</code>.</p>
+<p>Additional code that will be useful:</p>
+<ul>
+<li><code>scene-&gt;lights</code> is a vector storing pointers of all the lights in the scene</li>
+<li><code>SceneLight::is_delta_light()</code> returns <code>true</code> if the light is a point light source
+<ul>
+<li>You can (and should) save time by sampling a point light source only once (since all samples from a point light will be the same, anyway!)</li>
+</ul>
+</li>
+<li><code>SceneLight::sample_L(Vector3D&amp; p, Vector3D* wi, double* distToLight, double* pdf)</code>, which samples the light and:
+<ul>
+<li>returns the emitted radiance as a <code>Vector3D</code></li>
+<li>writes a world-space, unit <code>wi</code> vector giving the sampled direction between <code>p</code> and the light source</li>
+<li>writes a <code>distToLight</code> double giving the distance between <code>p</code> and the light source in the <code>wi</code> direction</li>
+<li>writes a <code>pdf</code> double giving the value of the probability density function evaluated at the <code>wi</code> direction</li>
+</ul>
+</li>
+<li><code>BVHAccel::intersect(Ray&amp; r, Intersection* i)</code></li>
+<li><code>BSDF::f(Vector3D&amp; wo, Vector3D&amp; wi)</code></li>
+<li><code>EPS_F</code>, an epsilon constant for numerical precision issues.</li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li>C++ supports <a href="https://en.cppreference.com/w/cpp/language/range-for">range-based for loops</a> for operating over, for example, vectors of pointers. (For your convenience.)</li>
+<li>It may be helpful to think about casting a ray between the hit point and the light as casting a "shadow" ray. If this ray intersects the scene, then the hit point is in a shadow with respect to the current light source.
+<ul>
+<li>When creating this ray, use the <code>max_t</code> field and <code>distToLight</code> value, since we care about intersections <em>before</em> the light.</li>
+<li>As in Task 2, don't forget to use the <code>EPS_F</code> offset for <code>min_t</code> when creating rays originating from existing intersections. This time, you should also subtract it from <code>distToLight</code> to similarly avoid intersecting with the light itself (we care about things <em>blocking</em> the light).</li>
+</ul>
+</li>
+<li>Similarly, don't bother casting this ray if you know the light is behind the surface at the hit point. (How can you check for this?)</li>
+<li>As in Task 2:
+<ul>
+<li>Don't forget the multiplicative and normalization factors when returning outgoing light!</li>
+</ul>
+</li>
+</ul>
+<p>To test your results, update<code>est_radiance_global_illumination()</code> to return <code>estimate_direct_lighting_importance()</code>. Now we can render images with less noise, as well as scenes lit by point lights!</p>
+<p>You can first check your implementation by using a low sample rate:</p>
+<pre><code>./pathtracer -t 8 -s 1 -l 1 -m 1 -f bunny_1_1.png -r 480 360 ../dae/sky/CBbunny.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/bunny_1_1.png" width="480px">
+</p>
+<p>At this point, here is the result of the following command, which took 39 seconds with the reference solution on a Hive machine.</p>
+<pre><code>./pathtracer -t 8 -s 64 -l 32 -m 6 -f bunny_64_32.png -r 480 360 ../dae/sky/CBbunny.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/bunny_64_32.png" width="480px">
+</p>
+<p>And the command below took 34 seconds with the reference solution on a Hive machine.</p>
+<pre><code>./pathtracer -t 8 -s 64 -l 32 -m 6  -f dragon_64_32.png -r 480 480 ../dae/sky/dragon.dae
+</code></pre>
+<p style="text-align:center">
+<img src="./part3_files/dragon_64_32.png" width="480px"> 
+</p>
+<p>Much better! Remember that you will be running experiments to compare these two methods for the <a href="./writeup.html">write-up</a>.</p>
+<script>$_mod_cal184.ready();</script><date-input-polyfill data-open="false"><span class="yearSelect-wrapper"><select class="yearSelect"><option value="1890">1890</option><option value="1891">1891</option><option value="1892">1892</option><option value="1893">1893</option><option value="1894">1894</option><option value="1895">1895</option><option value="1896">1896</option><option value="1897">1897</option><option value="1898">1898</option><option value="1899">1899</option><option value="1900">1900</option><option value="1901">1901</option><option value="1902">1902</option><option value="1903">1903</option><option value="1904">1904</option><option value="1905">1905</option><option value="1906">1906</option><option value="1907">1907</option><option value="1908">1908</option><option value="1909">1909</option><option value="1910">1910</option><option value="1911">1911</option><option value="1912">1912</option><option value="1913">1913</option><option value="1914">1914</option><option value="1915">1915</option><option value="1916">1916</option><option value="1917">1917</option><option value="1918">1918</option><option value="1919">1919</option><option value="1920">1920</option><option value="1921">1921</option><option value="1922">1922</option><option value="1923">1923</option><option value="1924">1924</option><option value="1925">1925</option><option value="1926">1926</option><option value="1927">1927</option><option value="1928">1928</option><option value="1929">1929</option><option value="1930">1930</option><option value="1931">1931</option><option value="1932">1932</option><option value="1933">1933</option><option value="1934">1934</option><option value="1935">1935</option><option value="1936">1936</option><option value="1937">1937</option><option value="1938">1938</option><option value="1939">1939</option><option value="1940">1940</option><option value="1941">1941</option><option value="1942">1942</option><option value="1943">1943</option><option value="1944">1944</option><option value="1945">1945</option><option value="1946">1946</option><option value="1947">1947</option><option value="1948">1948</option><option value="1949">1949</option><option value="1950">1950</option><option value="1951">1951</option><option value="1952">1952</option><option value="1953">1953</option><option value="1954">1954</option><option value="1955">1955</option><option value="1956">1956</option><option value="1957">1957</option><option value="1958">1958</option><option value="1959">1959</option><option value="1960">1960</option><option value="1961">1961</option><option value="1962">1962</option><option value="1963">1963</option><option value="1964">1964</option><option value="1965">1965</option><option value="1966">1966</option><option value="1967">1967</option><option value="1968">1968</option><option value="1969">1969</option><option value="1970">1970</option><option value="1971">1971</option><option value="1972">1972</option><option value="1973">1973</option><option value="1974">1974</option><option value="1975">1975</option><option value="1976">1976</option><option value="1977">1977</option><option value="1978">1978</option><option value="1979">1979</option><option value="1980">1980</option><option value="1981">1981</option><option value="1982">1982</option><option value="1983">1983</option><option value="1984">1984</option><option value="1985">1985</option><option value="1986">1986</option><option value="1987">1987</option><option value="1988">1988</option><option value="1989">1989</option><option value="1990">1990</option><option value="1991">1991</option><option value="1992">1992</option><option value="1993">1993</option><option value="1994">1994</option><option value="1995">1995</option><option value="1996">1996</option><option value="1997">1997</option><option value="1998">1998</option><option value="1999">1999</option><option value="2000">2000</option><option value="2001">2001</option><option value="2002">2002</option><option value="2003">2003</option><option value="2004">2004</option><option value="2005">2005</option><option value="2006">2006</option><option value="2007">2007</option><option value="2008">2008</option><option value="2009">2009</option><option value="2010">2010</option><option value="2011">2011</option><option value="2012">2012</option><option value="2013">2013</option><option value="2014">2014</option><option value="2015">2015</option><option value="2016">2016</option><option value="2017">2017</option><option value="2018">2018</option><option value="2019">2019</option><option value="2020">2020</option><option value="2021">2021</option><option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option><option value="2033">2033</option><option value="2034">2034</option><option value="2035">2035</option><option value="2036">2036</option><option value="2037">2037</option><option value="2038">2038</option><option value="2039">2039</option><option value="2040">2040</option><option value="2041">2041</option><option value="2042">2042</option></select></span><span class="monthSelect-wrapper"><select class="monthSelect"></select></span><button>Today</button><table><thead></thead><tbody></tbody></table></date-input-polyfill></body></html>
